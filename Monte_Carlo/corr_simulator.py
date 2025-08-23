@@ -1,7 +1,7 @@
 """
 Simulador de correlaciones mediante cópulas (Gaussiana o t-Student).
 
-- Define n variables con marginales específicas (normal o Gamma).
+- Define n variables con marginales específicas (normal o gamma).
 - Muestra N observaciones independientes.
 - Impone correlación entre vecinos (v_i con v_{i-1} y v_{i+1}) con ρ dado,
   construyendo una cópula en el espacio latente (gaussiano o t).
@@ -22,7 +22,7 @@ def build_distributions(specs):
     Crea objetos de distribución de scipy.stats a partir de especificaciones.
     Cada especificación puede ser:
       - ("normal", {"loc": 0, "scale": 1})
-      - ("Gamma", {"k": 2, "theta": 2})  # k=shape, theta=scale
+      - ("gamma", {"k": 2, "theta": 2})  # k=shape, theta=scale
     """
     dists = []
     for kind, params in specs:
@@ -30,11 +30,11 @@ def build_distributions(specs):
             loc = params.get("loc", 0.0)
             scale = params.get("scale", 1.0)
             dists.append(stats.norm(loc=loc, scale=scale))
-        elif kind.lower() in ("Gamma",):
-            # scipy.stats.Gamma usa 'a' como shape y 'scale' como theta
+        elif kind.lower() in ("gamma",):
+            # scipy.stats.gamma usa 'a' como shape y 'scale' como theta
             k = params.get("k", params.get("a", 2.0))
             theta = params.get("theta", params.get("scale", 1.0))
-            dists.append(stats.Gamma(a=k, scale=theta))
+            dists.append(stats.gamma(a=k, scale=theta))
         else:
             raise ValueError(f"Distribución no soportada: {kind}")
     return dists
@@ -175,8 +175,8 @@ def _convert_distributions(distributions):
     """
     Convierte lista de dicts estilo ind_simulator a specs usadas en este módulo.
     [{'dist_name': 'normal', 'params': {'mu': 0, 'std': 1}},
-     {'dist_name': 'Gamma', 'params': {'shape': 2, 'scale': 1}}]
-      -> [("normal", {"loc": 0, "scale": 1}), ("Gamma", {"k": 2, "theta": 1})]
+     {'dist_name': 'gamma', 'params': {'shape': 2, 'scale': 1}}]
+      -> [("normal", {"loc": 0, "scale": 1}), ("gamma", {"k": 2, "theta": 1})]
     """
     specs = []
     for d in distributions:
@@ -186,10 +186,10 @@ def _convert_distributions(distributions):
             mu = params.get('mu', params.get('loc', 0.0))
             std = params.get('std', params.get('scale', 1.0))
             specs.append(("normal", {"loc": mu, "scale": std}))
-        elif kind == 'Gamma':
+        elif kind == 'gamma':
             k = params.get('shape', params.get('k', 2.0))
             theta = params.get('scale', params.get('theta', 1.0))
-            specs.append(("Gamma", {"k": k, "theta": theta}))
+            specs.append(("gamma", {"k": k, "theta": theta}))
         else:
             raise ValueError(f"Distribución no soportada: {kind}")
     return specs
@@ -242,8 +242,8 @@ def Orchestrator(distributions=[], num_samples=10000, iterations=10000, T=None,
     Orquestador de simulación correlacionada con cópulas, usando el mismo estilo de
     entrada que ind_simulator.Orchestrator.
 
-    - distributions: lista de dicts {'dist_name': 'normal'|'Gamma', 'params': {...}}
-      normal: {'mu', 'std}; Gamma: {'shape', 'scale'}.
+    - distributions: lista de dicts {'dist_name': 'normal'|'gamma', 'params': {...}}
+      normal: {'mu', 'std}; gamma: {'shape', 'scale'}.
     - num_samples: tamaño de la muestra base (N) para construir la cópula.
     - iterations: número de iteraciones a muestrear de la muestra correlacionada para
       construir la distribución de la suma (similar a ind_simulator).
@@ -308,13 +308,13 @@ def main():
     copula = "gaussian"  # "gaussian" o "t"
     nu = 5  # grados de libertad si copula == "t"
 
-    # Definición de marginales (ejemplo: alternando normal y Gamma)
-    # v1 ~ normal(0,1), v2 ~ Gamma(k=2, θ=2), etc.
+    # Definición de marginales (ejemplo: alternando normal y gamma)
+    # v1 ~ normal(0,1), v2 ~ gamma(k=2, θ=2), etc.
     specs = [
         ("normal", {"loc": 0, "scale": 1}),
-        ("Gamma", {"k": 2, "theta": 2}),
+        ("gamma", {"k": 2, "theta": 2}),
         ("normal", {"loc": 1, "scale": 2}),
-        ("Gamma", {"k": 3, "theta": 1}),
+        ("gamma", {"k": 3, "theta": 1}),
         ("normal", {"loc": -1, "scale": 1.5}),
     ]
     # Si n != len(specs), extender/cortar de forma cíclica para el demo

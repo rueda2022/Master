@@ -26,9 +26,11 @@ def create_data(num_samples=10000, distribution='normal', params=None):
     if distribution == 'normal':
         mu, std = params["mu"], params["std"]
         data = np.random.normal(mu, std, num_samples)
-    elif distribution == 'Gamma':
-        shape, scale = params["shape"], params["scale"]
-        data = np.random.Gamma(shape, scale, num_samples)
+    elif distribution == 'gamma':
+        # Corregido: alpha es shape (forma), y usamos 1/beta como scale (escala)
+        # porque beta es el parámetro de tasa (rate) en la parametrización estándar
+        shape, rate = params["alpha"], params["beta"]
+        data = np.random.gamma(shape, scale=1.0/rate, size=num_samples)
     return data
 
 ## Function that plots the generated data with improved aesthetics

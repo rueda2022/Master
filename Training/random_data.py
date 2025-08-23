@@ -1,5 +1,5 @@
 import numpy as np
-# from scipy.stats import Gamma
+from scipy.stats import gamma  # Uncomment this import
 import networkx as nx
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
@@ -97,30 +97,38 @@ def get_parameters(G, filter_outliers_data=False):
         "max": np.max(all_distances)
     }
     
-    # Calculate time statistics if we have time data
+    # Calculate time statistics (optionally filtered) and the requested global min/max/mean without outliers
     time_stats = None
+    filtered_global_min = None
+    filtered_global_max = None
+    filtered_global_mean = None
+
     if len(all_times) > 0:
         if filter_outliers_data:
             filtered_times, time_outliers, _ = filter_outliers(all_times)
-            # Use filtered data for statistics
-            all_times_for_stats = filtered_times
+            # Use filtered list for both stats and the requested three values
+            if len(filtered_times) > 0:
+                filtered_global_min = float(np.min(filtered_times))
+                filtered_global_max = float(np.max(filtered_times))
+                filtered_global_mean = float(np.mean(filtered_times))
             time_stats = {
-                "median": np.median(filtered_times),
-                "q1": np.percentile(filtered_times, 25),
-                "q3": np.percentile(filtered_times, 75),
-                "iqr": np.percentile(filtered_times, 75) - np.percentile(filtered_times, 25),
-                "min": np.min(filtered_times),
-                "max": np.max(filtered_times),
-                "outliers_removed": len(time_outliers)
+                "median": float(np.median(filtered_times)) if len(filtered_times) > 0 else None,
+                "q1": float(np.percentile(filtered_times, 25)) if len(filtered_times) > 0 else None,
+                "q3": float(np.percentile(filtered_times, 75)) if len(filtered_times) > 0 else None,
+                "iqr": float(np.percentile(filtered_times, 75) - np.percentile(filtered_times, 25)) if len(filtered_times) > 0 else None,
+                "min": float(np.min(filtered_times)) if len(filtered_times) > 0 else None,
+                "max": float(np.max(filtered_times)) if len(filtered_times) > 0 else None,
+                "outliers_removed": int(len(time_outliers))
             }
         else:
+            # No filtering requested; keep existing behavior
             time_stats = {
-                "median": np.median(all_times),
-                "q1": np.percentile(all_times, 25),
-                "q3": np.percentile(all_times, 75),
-                "iqr": np.percentile(all_times, 75) - np.percentile(all_times, 25),
-                "min": np.min(all_times),
-                "max": np.max(all_times),
+                "median": float(np.median(all_times)),
+                "q1": float(np.percentile(all_times, 25)),
+                "q3": float(np.percentile(all_times, 75)),
+                "iqr": float(np.percentile(all_times, 75) - np.percentile(all_times, 25)),
+                "min": float(np.min(all_times)),
+                "max": float(np.max(all_times)),
                 "outliers_removed": 0
             }
 
@@ -128,7 +136,11 @@ def get_parameters(G, filter_outliers_data=False):
         "Overall Distance": np.mean([data["Distance"] for u, v, data in G.edges(data=True)]),
         "Overall Time limits": (overall_min_time, overall_max_time),
         "Distance Statistics": dist_stats,
-        "Time Statistics": time_stats
+        "Time Statistics": time_stats,
+        # New: global min, max, mean of time after removing outliers
+        "Filtered Time Min": filtered_global_min,
+        "Filtered Time Max": filtered_global_max,
+        "Filtered Time Mean": filtered_global_mean
     }
     return overall_params
 
@@ -291,72 +303,251 @@ def boxplot_with_stats(ax, data, title):
     
     return stats
 
-# def create_random_params(dist, corr):
-#     parameters = []
-#     p1 = p2 = p3 = p4 = p5 = 0
-
-#     if dist == ('normal', 'normal') and not corr:
-#         p1 = np.random.uniform(0, 5)      # mu1
-#         p2 = np.random.uniform(0.1, 1.5)  # sigma1
-#         p3 = np.random.uniform(0, 5)      # mu2
-#         p4 = np.random.uniform(0.1, 1.5)  # sigma2
-#         parameters = [p1, p2, p3, p4]
-#     elif dist == ('normal', 'normal') and corr:
-#         p1 = np.random.uniform(0, 5)
-#         p2 = np.random.uniform(0.1, 1.5)
-#         p3 = np.random.uniform(0, 5)
-#         p4 = np.random.uniform(0.1, 1.5)
-#         p5 = np.random.uniform(0, 0.9)
-#         parameters = [p1, p2, p3, p4, p5]
-#     elif dist == ('Gamma', 'Gamma') and not corr:
-#         p1 = np.random.uniform(0.1, 5)    # alpha1 > 0
-#         p2 = np.random.uniform(0.1, 1.5)  # beta1
-#         p3 = np.random.uniform(0.1, 5)    # alpha2 > 0
-#         p4 = np.random.uniform(0.1, 1.5)  # beta2
-#         parameters = [p1, p2, p3, p4]
-#     else:
-#         raise ValueError(f"Combinación no soportada: dist={dist}, corr={corr}")
+def suggest_parameter_ranges(G):
+    """
+    Analiza el grafo para sugerir rangos de parámetros apropiados para el entrenamiento
+    de redes neuronales basados únicamente en propiedades estadísticas de tiempo del grafo.
     
-#     return parameters
-
-# def create_distribution(dist, corr, n, parameters):
-#     X1 = np.zeros(n)
-#     X2 = np.zeros(n)
-    
-#     if dist == ('normal', 'normal', ) and not corr:
-#         X1 = np.random.normal(parameters[0], parameters[1], size=n)
-#         X2 = np.random.normal(parameters[2], parameters[3], size=n)
-#     elif dist == ('normal', 'normal') and corr == True :
-#         Z1 = np.random.normal(0, 1, size=n)
-#         Z2 = np.random.normal(0, 1, size=n)
-#         X1 = parameters[0] + parameters[1] * Z1
-#         X2 = parameters[2] + parameters[3] * (parameters[4] * Z1 + np.sqrt(1 - parameters[4]**2) * Z2)
-#     elif dist == ('Gamma', 'Gamma') and not corr:
-#         X1 = Gamma.rvs(a=parameters[0], scale=1/parameters[1], size=n)
-#         X2 = Gamma.rvs(a=parameters[2], scale=1/parameters[3], size=n)
-#     else:
-#         raise ValueError(f"Combinación no soportada: dist={dist}, corr={corr}")
-    
-#     return X1, X2
-
-# def data_simulation(n, dist=('normal', 'normal'), corr=False):
-#     N = 10000
-#     inputs = []
-#     outputs = []
-#     percentiles = np.arange(0.05, 1.01, 0.05)
-
-#     for i in range(N):
-#         params = create_random_params(dist, corr)
-#         inputs.append(params)  
+    Parameters:
+    -----------
+    G : networkx.Graph
+        El grafo a analizar
         
-#         X1, X2 = create_distribution(dist, corr, n, params)
-#         Y = X1 + X2
-#         Y = np.sort(Y)
-        
-#         ni = [np.percentile(Y, p * 100) for p in percentiles]
-#         outputs.append(ni)
-
-#     inputs = np.array(inputs)
-#     outputs = np.array(outputs)
+    Returns:
+    --------
+    param_ranges : dict
+        Diccionario con rangos sugeridos para distintos parámetros
+    """
+    # Obtener estadísticas del grafo
+    overall_params = get_parameters(G, filter_outliers_data=True)
     
-#     return {'inputs': inputs, 'outputs': outputs, 'percentiles': percentiles}
+    # Extraer solo datos de tiempo
+    time_stats = overall_params["Time Statistics"]
+    
+    # Valores por defecto en caso de no tener estadísticas de tiempo
+    default_mu_max = 2.0
+    default_sigma_max = 0.5
+    
+    # Calcular rangos para distribuciones normales usando solo estadísticas de tiempo
+    param_ranges = {
+        'normal': {
+            # Rango para mu basado solo en estadísticas de tiempo
+            'mu_min': 0,  # Aseguramos valores positivos
+            'mu_max': time_stats["median"] * 2 if time_stats and time_stats["median"] else default_mu_max,
+            
+            # Rango para sigma basado solo en IQR de tiempo
+            'sigma_min': 0.01,  # Un valor pequeño pero no cero
+            'sigma_max': time_stats["iqr"] * 0.75 if time_stats and time_stats["iqr"] else default_sigma_max
+        }
+    }
+    
+    # Calcular rangos para distribuciones gamma basados en las estadísticas de tiempo
+    # Para una distribución gamma: 
+    # - Media = alpha/beta
+    # - Varianza = alpha/beta²
+    # Por lo tanto, si conocemos media (μ) y varianza (σ²):
+    # - alpha = μ²/σ²
+    # - beta = μ/σ²
+    
+    if time_stats and time_stats["median"] and time_stats["iqr"]:
+        # Estimar media y varianza a partir de estadísticas robustas
+        mean_time = time_stats["median"]
+        # Aproximación de la desviación estándar basada en IQR
+        std_time = time_stats["iqr"] / 1.35
+        variance = std_time**2
+        
+        if variance > 0:
+            # Calcular estimaciones base para alpha y beta
+            estimated_alpha = (mean_time**2) / variance
+            estimated_beta = mean_time / variance
+            
+            # Establecer rangos razonables alrededor de las estimaciones
+            alpha_min = max(0.1, estimated_alpha * 0.5)
+            alpha_max = estimated_alpha * 2.0
+            beta_min = max(0.1, estimated_beta * 0.5)
+            beta_max = estimated_beta * 2.0
+            
+            # Limitar los rangos a valores razonables
+            alpha_max = min(alpha_max, 20.0)  # Evitar valores extremadamente altos
+            beta_max = min(beta_max, 15.0)
+        else:
+            # Valores por defecto si no podemos calcular
+            alpha_min, alpha_max = 0.5, 5.0
+            beta_min, beta_max = 0.5, 5.0
+    else:
+        # Valores por defecto si no hay estadísticas de tiempo
+        alpha_min, alpha_max = 0.5, 5.0
+        beta_min, beta_max = 0.5, 5.0
+    
+    param_ranges['gamma'] = {
+        'alpha_min': alpha_min,
+        'alpha_max': alpha_max,
+        'beta_min': beta_min,
+        'beta_max': beta_max
+    }
+    
+    # Añadir solo estadísticas de tiempo para referencia
+    param_ranges['stats'] = {
+        'time': time_stats,
+        'overall_mean': time_stats["median"] if time_stats and time_stats["median"] else 1.0,
+        'avg_std': (time_stats["iqr"] / 1.35) if time_stats and time_stats["iqr"] else 0.5,
+        # Agregar estimaciones calculadas para distribuciones gamma
+        'estimated_gamma_alpha': estimated_alpha if time_stats and time_stats["median"] and variance > 0 else None,
+        'estimated_gamma_beta': estimated_beta if time_stats and time_stats["median"] and variance > 0 else None
+    }
+    
+    return param_ranges
+
+def create_random_params(params, dist, corr):
+    """
+    Crea parámetros aleatorios para distribuciones basados en rangos sugeridos.
+    
+    Parameters:
+    -----------
+    params : dict
+        Diccionario con rangos de parámetros
+    dist : tuple
+        Tupla con las distribuciones a utilizar
+    corr : bool
+        Indica si se debe incluir correlación
+        
+    Returns:
+    --------
+    parameters : list
+        Lista de parámetros generados
+    """
+    # Usar rangos dinámicos basados en el grafo si están disponibles
+    if isinstance(params, dict) and 'normal' in params:
+        # Estos son rangos sugeridos
+        min_mu = params['normal']['mu_min']
+        max_mu = params['normal']['mu_max']
+        min_sigma = params['normal']['sigma_min']
+        max_sigma = params['normal']['sigma_max']
+    else:
+        # Fallback a la lógica original cuando no está la estructura esperada
+        if isinstance(params, dict) and 'overall_mean' in params and 'avg_std' in params:
+            min_mu = 0
+            max_mu = params['overall_mean'] + params['avg_std']
+            min_sigma = 0
+            max_sigma = 0.5
+        else:
+            # Si ni siquiera tenemos los parámetros básicos, usar valores por defecto
+            min_mu = 0
+            max_mu = 1.0
+            min_sigma = 0
+            max_sigma = 0.5
+
+    if dist == ('normal', 'normal') and not corr:
+        p1 = np.random.uniform(min_mu, max_mu)      # mu1
+        p2 = np.random.uniform(min_sigma, max_sigma)  # sigma1
+        p3 = np.random.uniform(min_mu, max_mu)      # mu2
+        p4 = np.random.uniform(min_sigma, max_sigma)  # sigma2
+        parameters = [p1, p2, p3, p4]
+    elif dist == ('normal', 'normal') and corr:
+        p1 = np.random.uniform(min_mu, max_mu)      # mu1
+        p2 = np.random.uniform(min_sigma, max_sigma)  # sigma1
+        p3 = np.random.uniform(min_mu, max_mu)      # mu2
+        p4 = np.random.uniform(min_sigma, max_sigma)  # sigma2
+        p5 = np.random.uniform(0, 0.9)
+        parameters = [p1, p2, p3, p4, p5]
+    elif dist == ('gamma', 'gamma') and not corr:
+        if isinstance(params, dict) and 'gamma' in params:
+            alpha_min = params['gamma']['alpha_min']
+            alpha_max = params['gamma']['alpha_max']
+            beta_min = params['gamma']['beta_min']
+            beta_max = params['gamma']['beta_max']
+        else:
+            alpha_min, alpha_max = 0.1, 5
+            beta_min, beta_max = 0.1, 1.5
+            
+        p1 = np.random.uniform(alpha_min, alpha_max)    # alpha1 > 0
+        p2 = np.random.uniform(beta_min, beta_max)      # beta1
+        p3 = np.random.uniform(alpha_min, alpha_max)    # alpha2 > 0
+        p4 = np.random.uniform(beta_min, beta_max)      # beta2
+        parameters = [p1, p2, p3, p4]
+    else:
+        raise ValueError(f"Combinación no soportada: dist={dist}, corr={corr}")
+    
+    return parameters
+
+def create_distribution(dist, corr, n, parameters):
+    X1 = np.zeros(n)
+    X2 = np.zeros(n)
+    
+    if dist == ('normal', 'normal') and not corr:
+        X1 = np.random.normal(parameters[0], parameters[1], n)
+        X2 = np.random.normal(parameters[2], parameters[3], n)
+    elif dist == ('normal', 'normal') and corr:
+        Z1 = np.random.normal(0, 1, size=n)
+        Z2 = np.random.normal(0, 1, size=n)
+        X1 = parameters[0] + parameters[1] * Z1
+        X2 = parameters[2] + parameters[3] * (parameters[4] * Z1 + np.sqrt(1 - parameters[4]**2) * Z2)
+        # Make sure values are positive
+        X1 = np.maximum(0.001, X1)
+        X2 = np.maximum(0.001, X2)
+    elif dist == ('gamma', 'gamma') and not corr:
+        X1 = gamma.rvs(a=parameters[0], scale=1/parameters[1], size=n)
+        X2 = gamma.rvs(a=parameters[2], scale=1/parameters[3], size=n)
+    else:
+        raise ValueError(f"Unsupported combination: dist={dist}, corr={corr}")
+    
+    return X1, X2
+
+def positive_normal(loc, scale, size):
+    result = np.zeros(size)
+    for i in range(size):
+        value = np.random.normal(loc, scale)
+        while value < 0:  # Repetir hasta obtener valor positivo
+            value = np.random.normal(loc, scale)
+        result[i] = value
+    return result
+
+
+def data_simulation(n, G=None, input_params=None, dist=('normal', 'normal'), corr=False):
+    """
+    Simula datos basados en un grafo o parámetros de entrada.
+    
+    Parameters:
+    -----------
+    n : int
+        Número de muestras
+    G : networkx.Graph, optional
+        Grafo para extraer parámetros (tiene prioridad sobre input_params)
+    input_params : dict, optional
+        Parámetros predefinidos (usado si G es None)
+    dist : tuple
+        Tupla de distribuciones
+    corr : bool
+        Indica si incluir correlación
+        
+    Returns:
+    --------
+    dict
+        Diccionario con datos simulados
+    """
+    N = 100000
+    inputs = []
+    outputs = []
+    percentiles = np.arange(0.05, 1.01, 0.05)
+    
+    # Si tenemos un grafo, usamos sus propiedades para sugerir rangos
+    if G is not None:
+        param_ranges = suggest_parameter_ranges(G)
+    else:
+        param_ranges = input_params
+    
+    for _ in range(N):
+        params = create_random_params(param_ranges, dist, corr)
+        inputs.append(params)  
+        
+        X1, X2 = create_distribution(dist, corr, n, params)
+        Y = X1 + X2
+        Y = np.sort(Y)
+        
+        ni = [np.percentile(Y, p * 100) for p in percentiles]
+        outputs.append(ni)
+
+    inputs = np.array(inputs)
+    outputs = np.array(outputs)
+    
+    return {'inputs': inputs, 'outputs': outputs, 'percentiles': percentiles, 'param_ranges': param_ranges}
