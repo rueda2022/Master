@@ -1,0 +1,19 @@
+# Requirements for the project
+# Requirements for the project
+numpy>=1.25
+pandas>=2.0
+seaborn>=0.12
+matplotlib>=3.7
+scipy>=1.10
+
+# # Interactive widgets and IPython utilities
+# ipywidgets>=8.1
+# ipython>=8.0
+
+# # Deep learning (Apple Silicon usa tensorflow-macos + tensorflow-metal)
+# tensorflow>=2.15; platform_system!="Darwin" or platform_machine!="arm64"
+# tensorflow-macos>=2.15; platform_system=="Darwin" and platform_machine=="arm64"
+# tensorflow-metal>=1.1; platform_system=="Darwin" and platform_machine=="arm64"
+
+
+# keras==2.15.0
